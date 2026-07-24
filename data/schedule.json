@@ -38,13 +38,7 @@
       "colour": "#b45309"
     }
   },
-  "overrides": {
-    "2026-07-24": {
-      "bin": "brown",
-      "movedTo": "2026-08-21",
-      "noticedAt": "2026-07-24"
-    }
-  },
+  "overrides": {},
   "lastScrape": {
     "checkedAt": "2026-07-24T10:23:55+01:00",
     "agrees": true,

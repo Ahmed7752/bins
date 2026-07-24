@@ -42,8 +42,18 @@ def build_collections(cfg):
                 out.append((d, bin_key, False))
             d += step
 
-    out.sort(key=lambda r: (r[0], r[1]))
-    return out
+    # An override can land on a date the cycle already covers -- a collection
+    # pushed onto the following slot, say. Without this, that bin would be
+    # listed twice on the same day. Sorting puts the unmoved entry first, so
+    # keeping the first occurrence prefers the genuine scheduled collection.
+    out.sort(key=lambda r: (r[0], r[1], r[2]))
+    deduped, seen = [], set()
+    for collection_day, bin_key, moved in out:
+        if (collection_day, bin_key) in seen:
+            continue
+        seen.add((collection_day, bin_key))
+        deduped.append((collection_day, bin_key, moved))
+    return deduped
 
 
 def esc(text: str) -> str:
