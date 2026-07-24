@@ -292,8 +292,8 @@ def build_setup_html(cfg) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0f172a">
 <title>Set up bin reminders</title>
-<link rel="apple-touch-icon" href="../icon.png">
-<link rel="icon" href="../icon.png">
+<link rel="apple-touch-icon" href="__BASE__/icon.png">
+<link rel="icon" href="__BASE__/icon.png">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{
@@ -310,7 +310,12 @@ def build_setup_html(cfg) -> str:
     padding:1.05rem 1rem;border-radius:.8rem;margin:.25rem 0 .5rem;
     box-shadow:0 12px 28px -14px rgba(34,197,94,.9)
   }
-  .btn.secondary{background:rgba(148,163,184,.16);color:#f8fafc;box-shadow:none;font-weight:600}
+  .btn.alt{background:#38bdf8;color:#052436;box-shadow:0 12px 28px -14px rgba(56,189,248,.9)}
+  .hint{
+    display:flex;align-items:center;justify-content:center;gap:.5rem;
+    margin-top:.85rem;color:#94a3b8;font-size:.9rem;text-align:center
+  }
+  .hint svg{flex:0 0 auto}
   ol{list-style:none;counter-reset:s}
   li{
     counter-increment:s;position:relative;padding:0 0 1.75rem 3rem;
@@ -340,7 +345,7 @@ def build_setup_html(cfg) -> str:
     .sub,p.note,footer{color:#64748b}
     li::before{background:#fff;border-color:#cbd5e1;color:#334155}
     li{border-left-color:#e2e8f0}
-    .btn.secondary{background:#e2e8f0;color:#0f172a}
+    .hint{color:#64748b}
     a{color:#0369a1}
   }
 </style>
@@ -373,11 +378,23 @@ def build_setup_html(cfg) -> str:
     <li>
       <h2>Put it on the home screen</h2>
       <p class="note">
-        Open the page below in <strong>Safari</strong>, then tap Share
-        &rarr; <strong>Add to Home Screen</strong>. iOS only allows this by hand
-        &mdash; no link or QR code can do it for you.
+        Tap below to open the bin page in <strong>Safari</strong>.
       </p>
-      <a class="btn secondary" href="../">Open the bin page</a>
+      <a class="btn alt" href="__BASE__/">Open the bin page</a>
+      <div class="hint">
+        <span>then tap</span>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v13"/><path d="M8 7l4-4 4 4"/>
+          <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>
+        </svg>
+        <span>&rarr; <strong>Add to Home Screen</strong></span>
+      </div>
+      <p class="note" style="margin-top:.7rem">
+        That last tap has to be yours &mdash; iOS lets nothing but you install a
+        home-screen icon.
+      </p>
     </li>
   </ol>
 
@@ -388,7 +405,7 @@ def build_setup_html(cfg) -> str:
 </div>
 </body>
 </html>
-""".replace("__WEBCAL__", webcal).replace("__FEED__", feed)
+""".replace("__WEBCAL__", webcal).replace("__FEED__", feed).replace("__BASE__", base)
 
 
 def build_qr(url: str, path: pathlib.Path):
