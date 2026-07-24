@@ -38,30 +38,10 @@
       "colour": "#b45309"
     }
   },
-  "overrides": {
-    "2026-07-31": {
-      "bin": "black",
-      "movedTo": "2026-07-30",
-      "noticedAt": "2026-07-24"
-    },
-    "2026-08-07": {
-      "bin": "blue",
-      "movedTo": "2026-08-06",
-      "noticedAt": "2026-07-24"
-    },
-    "2026-07-24": {
-      "bin": "brown",
-      "movedTo": "2026-08-20",
-      "noticedAt": "2026-07-24"
-    }
-  },
+  "overrides": {},
   "lastScrape": {
-    "checkedAt": "2026-07-24T09:18:08+00:00",
-    "agrees": false,
-    "observed": {
-      "black": "2026-07-30",
-      "blue": "2026-08-06",
-      "brown": "2026-08-20"
-    }
+    "checkedAt": null,
+    "agrees": null,
+    "observed": {}
   }
 }

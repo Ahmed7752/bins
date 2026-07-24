@@ -20,6 +20,11 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  # Runners are UTC. The collection dates are UK-local, and during BST a
+  # UTC reading lands a day early, so pin the whole job to UK time.
+  TZ: Europe/London
+
 jobs:
   build:
     runs-on: ubuntu-latest

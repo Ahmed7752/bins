@@ -45,10 +45,19 @@ def scrape(point_id: str, timeout_ms: int = 60000) -> dict:
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page(user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-        ))
+        # The council site formats its dates client-side, so the browser's
+        # timezone decides what they say. Under UTC, a midnight-BST date
+        # renders as 23:00 the previous day and every collection reads a day
+        # early. Pin to UK time -- CI runners are UTC.
+        context = browser.new_context(
+            timezone_id="Europe/London",
+            locale="en-GB",
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            ),
+        )
+        page = context.new_page()
         page.goto(url, wait_until="networkidle", timeout=timeout_ms)
         # The bin cards are client-rendered; wait for one to appear.
         page.wait_for_selector("h2:text-is('Black Bin')", timeout=timeout_ms)
@@ -72,6 +81,7 @@ def scrape(point_id: str, timeout_ms: int = 60000) -> dict:
                 d, m, y = match.group(1).split("/")
                 observed[name.split()[0].lower()] = f"{y}-{m}-{d}"
 
+        context.close()
         browser.close()
 
     if len(observed) < 3:
@@ -102,11 +112,28 @@ def main() -> int:
             disagreements[bin_key] = {
                 "expected": predicted.isoformat(),
                 "actual": actual.isoformat(),
+                "shiftDays": (actual - predicted).days,
             }
+
+    # The council reschedules individual collections, not the whole round at
+    # once. Every bin shifting by the same amount is a bug on our side -- a
+    # timezone or parsing fault -- so refuse to write it into the calendar.
+    shifts = {d["shiftDays"] for d in disagreements.values()}
+    systematic = len(disagreements) == len(cfg["rule"]) and len(shifts) == 1
+
+    if systematic:
+        shift = shifts.pop()
+        print(
+            f"::error title=Suspect scrape::All {len(disagreements)} bins shifted by "
+            f"{shift:+d} day(s). Treating as a scraper fault, not a reschedule. "
+            "No overrides written."
+        )
+    else:
+        for bin_key, d in disagreements.items():
             # Record as a one-off move, leaving the underlying cycle intact.
-            cfg["overrides"][predicted.isoformat()] = {
+            cfg["overrides"][d["expected"]] = {
                 "bin": bin_key,
-                "movedTo": actual.isoformat(),
+                "movedTo": d["actual"],
                 "noticedAt": today.isoformat(),
             }
 
@@ -116,6 +143,9 @@ def main() -> int:
         "observed": observed,
     }
     SCHEDULE.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+
+    if systematic:
+        return 1
 
     if disagreements:
         # Surface it to the workflow without failing the build -- the
