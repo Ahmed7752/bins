@@ -28,12 +28,20 @@ PROPERTY_URL = (
 CARD_RE = re.compile(r"Next collection(\d{2}/\d{2}/\d{4})")
 
 
-def predicted_on_or_after(anchor: date, interval: int, today: date) -> date:
-    """First scheduled collection falling on or after `today`."""
-    if anchor >= today:
-        return anchor
-    gap = (today - anchor).days
-    steps = -(-gap // interval)  # ceil division
+def on_cycle(anchor: date, interval: int, day: date) -> bool:
+    """Does `day` fall on the rule's repeating lattice?
+
+    This is the real invariant to test, rather than 'is it the next date I
+    expect'. On a collection morning the council has already advanced its
+    'next collection' to the following cycle, and a bin whose turn is today
+    would otherwise look rescheduled every fortnight.
+    """
+    return (day - anchor).days % interval == 0
+
+
+def nearest_on_cycle(anchor: date, interval: int, day: date) -> date:
+    """The lattice date closest to `day` -- i.e. the slot it moved out of."""
+    steps = round((day - anchor).days / interval)
     return anchor + timedelta(days=steps * interval)
 
 
@@ -102,17 +110,18 @@ def main() -> int:
     disagreements = {}
     for bin_key, spec in cfg["rule"].items():
         anchor = date.fromisoformat(spec["anchor"])
-        predicted = predicted_on_or_after(anchor, spec["intervalDays"], today)
+        interval = spec["intervalDays"]
         actual = date.fromisoformat(observed[bin_key])
 
-        if predicted == actual:
-            print(f"  OK       {bin_key:6s} next={actual} (matches rule)")
+        if on_cycle(anchor, interval, actual):
+            print(f"  OK       {bin_key:6s} next={actual} (on cycle)")
         else:
-            print(f"  DEVIATES {bin_key:6s} rule={predicted} site={actual}")
+            slot = nearest_on_cycle(anchor, interval, actual)
+            print(f"  DEVIATES {bin_key:6s} slot={slot} site={actual}")
             disagreements[bin_key] = {
-                "expected": predicted.isoformat(),
+                "expected": slot.isoformat(),
                 "actual": actual.isoformat(),
-                "shiftDays": (actual - predicted).days,
+                "shiftDays": (actual - slot).days,
             }
 
     # The council reschedules individual collections, not the whole round at
