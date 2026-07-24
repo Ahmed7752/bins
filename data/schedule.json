@@ -38,10 +38,20 @@
       "colour": "#b45309"
     }
   },
-  "overrides": {},
+  "overrides": {
+    "2026-07-24": {
+      "bin": "brown",
+      "movedTo": "2026-08-21",
+      "noticedAt": "2026-07-24"
+    }
+  },
   "lastScrape": {
-    "checkedAt": null,
-    "agrees": null,
-    "observed": {}
+    "checkedAt": "2026-07-24T10:21:27+01:00",
+    "agrees": false,
+    "observed": {
+      "black": "2026-07-31",
+      "blue": "2026-08-07",
+      "brown": "2026-08-21"
+    }
   }
 }
