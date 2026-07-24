@@ -1,0 +1,134 @@
+"""Check the council site against the stored cycle rule.
+
+The rule in data/schedule.json is deliberately stable. This script does not
+rebase it -- it only confirms it, or records a one-off override when the
+council has moved a single collection (bank holidays, severe weather).
+
+A genuine permanent change to the rounds shows up as the same disagreement
+week after week, which the workflow escalates as an issue rather than
+silently rotating the whole calendar.
+"""
+
+import json
+import pathlib
+import re
+import sys
+from datetime import date, datetime, timedelta
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SCHEDULE = ROOT / "data" / "schedule.json"
+
+PROPERTY_URL = (
+    "https://wasteservices.sheffield.gov.uk"
+    "/recycling-rubbish/property-search/{point_id}/your-collection-days"
+)
+
+# The property page renders three cards, one per bin. Each ends with
+# "Next collection" followed by a dd/mm/yyyy date.
+CARD_RE = re.compile(r"Next collection(\d{2}/\d{2}/\d{4})")
+
+
+def predicted_on_or_after(anchor: date, interval: int, today: date) -> date:
+    """First scheduled collection falling on or after `today`."""
+    if anchor >= today:
+        return anchor
+    gap = (today - anchor).days
+    steps = -(-gap // interval)  # ceil division
+    return anchor + timedelta(days=steps * interval)
+
+
+def scrape(point_id: str, timeout_ms: int = 60000) -> dict:
+    from playwright.sync_api import sync_playwright
+
+    url = PROPERTY_URL.format(point_id=point_id)
+    observed = {}
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(user_agent=(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+        ))
+        page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+        # The bin cards are client-rendered; wait for one to appear.
+        page.wait_for_selector("h2:text-is('Black Bin')", timeout=timeout_ms)
+
+        for heading in page.query_selector_all("h2"):
+            name = (heading.inner_text() or "").strip()
+            if not re.fullmatch(r"(Black|Blue|Brown) Bin", name):
+                continue
+            # Walk up until we find the card that carries "Next collection".
+            node = heading
+            text = ""
+            for _ in range(6):
+                node = node.evaluate_handle("e => e.parentElement").as_element()
+                if node is None:
+                    break
+                text = node.inner_text() or ""
+                if "Next collection" in text:
+                    break
+            match = CARD_RE.search(text.replace("\n", ""))
+            if match:
+                d, m, y = match.group(1).split("/")
+                observed[name.split()[0].lower()] = f"{y}-{m}-{d}"
+
+        browser.close()
+
+    if len(observed) < 3:
+        raise SystemExit(
+            f"Only found {len(observed)} of 3 bins ({sorted(observed)}). "
+            "The council site markup has probably changed -- check scrape.py."
+        )
+    return observed
+
+
+def main() -> int:
+    cfg = json.loads(SCHEDULE.read_text(encoding="utf-8"))
+    today = date.today()
+
+    observed = scrape(cfg["propertyId"])
+    print(f"Scraped next collections: {observed}")
+
+    disagreements = {}
+    for bin_key, spec in cfg["rule"].items():
+        anchor = date.fromisoformat(spec["anchor"])
+        predicted = predicted_on_or_after(anchor, spec["intervalDays"], today)
+        actual = date.fromisoformat(observed[bin_key])
+
+        if predicted == actual:
+            print(f"  OK       {bin_key:6s} next={actual} (matches rule)")
+        else:
+            print(f"  DEVIATES {bin_key:6s} rule={predicted} site={actual}")
+            disagreements[bin_key] = {
+                "expected": predicted.isoformat(),
+                "actual": actual.isoformat(),
+            }
+            # Record as a one-off move, leaving the underlying cycle intact.
+            cfg["overrides"][predicted.isoformat()] = {
+                "bin": bin_key,
+                "movedTo": actual.isoformat(),
+                "noticedAt": today.isoformat(),
+            }
+
+    cfg["lastScrape"] = {
+        "checkedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "agrees": not disagreements,
+        "observed": observed,
+    }
+    SCHEDULE.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+
+    if disagreements:
+        # Surface it to the workflow without failing the build -- the
+        # calendar still regenerates, now including the override.
+        summary = "; ".join(
+            f"{k}: rule said {v['expected']}, site says {v['actual']}"
+            for k, v in disagreements.items()
+        )
+        print(f"::warning title=Collection rescheduled::{summary}")
+        pathlib.Path("deviation.txt").write_text(summary, encoding="utf-8")
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

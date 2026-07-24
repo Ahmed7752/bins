@@ -1,0 +1,94 @@
+name: Update bin calendar
+
+on:
+  schedule:
+    # Twice a week. Thursday's run lands before the 6pm reminder fires,
+    # so a mid-week reschedule still reaches the phone in time.
+    - cron: "0 6 * * 1"
+    - cron: "0 6 * * 4"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  issues: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Check council site against the stored cycle
+        id: scrape
+        # Never block the rebuild on a scrape failure: the rule is verified
+        # and enumerated three years ahead, so a stale check still yields a
+        # correct calendar. The step's outcome is surfaced below instead.
+        continue-on-error: true
+        run: python scripts/scrape.py
+
+      - name: Build site
+        run: python scripts/generate.py
+
+      - name: Commit schedule changes
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/schedule.json
+          if git diff --staged --quiet; then
+            echo "No schedule change."
+          else
+            git commit -m "chore: refresh collection schedule [skip ci]"
+            git push
+          fi
+
+      - name: Flag a reschedule
+        if: hashFiles('deviation.txt') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "Collection rescheduled by the council" \
+            --body "The council site disagrees with the stored cycle:
+
+          $(cat deviation.txt)
+
+          A one-off override has been recorded and the calendar rebuilt. If this
+          same disagreement appears for several weeks running, the rounds have
+          genuinely changed and \`data/schedule.json\` needs its anchors updating."
+
+      - name: Warn if the scrape failed
+        if: steps.scrape.outcome == 'failure'
+        run: echo "::warning title=Scrape failed::Calendar rebuilt from the stored rule. If this repeats, the council site markup has likely changed."
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

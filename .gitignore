@@ -1,0 +1,5 @@
+site/
+deviation.txt
+__pycache__/
+*.pyc
+.venv/

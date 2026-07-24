@@ -1,0 +1,51 @@
+{
+  "propertyId": "60790",
+  "council": "Sheffield City Council / Veolia",
+  "collectionDay": "Friday",
+  "putOutBy": "07:00",
+  "remindAt": "18:00",
+
+  "_comment": [
+    "'rule' is the stable, hand-verified cycle. It is NOT auto-rebased by the scraper:",
+    "a one-off bank-holiday shift must never permanently rotate the whole cycle.",
+    "Verified against the council's published 12-month calendar (Jul 2026 - Jun 2027):",
+    "all 26 collections on the second half matched the rule exactly.",
+    "The council also states the cadence in words on the property page:",
+    "black = 'Every Friday fortnightly', blue and brown = 'Every 4th Friday'."
+  ],
+
+  "rule": {
+    "black": {
+      "anchor": "2026-07-31",
+      "intervalDays": 14,
+      "label": "BLACK",
+      "cadence": "Every Friday fortnightly",
+      "contents": "Non-recyclable waste",
+      "colour": "#374151"
+    },
+    "blue": {
+      "anchor": "2026-08-07",
+      "intervalDays": 28,
+      "label": "BLUE",
+      "cadence": "Every 4th Friday",
+      "contents": "Paper and card",
+      "colour": "#2563eb"
+    },
+    "brown": {
+      "anchor": "2026-07-24",
+      "intervalDays": 28,
+      "label": "BROWN",
+      "cadence": "Every 4th Friday",
+      "contents": "Glass bottles, jars, tins, cans, foil, plastic and cartons",
+      "colour": "#b45309"
+    }
+  },
+
+  "overrides": {},
+
+  "lastScrape": {
+    "checkedAt": null,
+    "agrees": null,
+    "observed": {}
+  }
+}
