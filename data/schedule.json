@@ -46,8 +46,8 @@
     }
   },
   "lastScrape": {
-    "checkedAt": "2026-07-24T10:21:27+01:00",
-    "agrees": false,
+    "checkedAt": "2026-07-24T10:23:55+01:00",
+    "agrees": true,
     "observed": {
       "black": "2026-07-31",
       "blue": "2026-08-07",
