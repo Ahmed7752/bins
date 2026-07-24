@@ -276,6 +276,135 @@ def build_html(cfg, collections) -> str:
 """.replace("__DATA__", payload).replace("__PID__", cfg["propertyId"])
 
 
+def build_setup_html(cfg) -> str:
+    """Landing page for the QR code: one tap to subscribe, then the two
+    steps iOS will not let a link do on your behalf."""
+    base = cfg["siteUrl"].rstrip("/")
+    feed = f"{base}/bins.ics"
+    # webcal:// is what makes iOS hand the feed to Calendar instead of
+    # downloading it as a file.
+    webcal = "webcal://" + feed.split("://", 1)[1]
+
+    return """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Set up bin reminders</title>
+<link rel="apple-touch-icon" href="../icon.png">
+<link rel="icon" href="../icon.png">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#0f172a;color:#f8fafc;-webkit-font-smoothing:antialiased;
+    padding:max(2rem,env(safe-area-inset-top)) 1.25rem max(3rem,env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:30rem;margin:0 auto}
+  h1{font-size:1.75rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.4rem}
+  .sub{color:#94a3b8;margin-bottom:2.25rem}
+  .btn{
+    display:block;text-align:center;text-decoration:none;
+    background:#22c55e;color:#052e16;font-weight:700;font-size:1.05rem;
+    padding:1.05rem 1rem;border-radius:.8rem;margin:.25rem 0 .5rem;
+    box-shadow:0 12px 28px -14px rgba(34,197,94,.9)
+  }
+  .btn.secondary{background:rgba(148,163,184,.16);color:#f8fafc;box-shadow:none;font-weight:600}
+  ol{list-style:none;counter-reset:s}
+  li{
+    counter-increment:s;position:relative;padding:0 0 1.75rem 3rem;
+    border-left:2px solid rgba(148,163,184,.22);margin-left:1rem
+  }
+  li:last-child{border-left-color:transparent;padding-bottom:0}
+  li::before{
+    content:counter(s);position:absolute;left:-1.05rem;top:-.15rem;
+    width:2.1rem;height:2.1rem;border-radius:50%;
+    background:#1e293b;border:2px solid #334155;
+    display:grid;place-items:center;font-size:.9rem;font-weight:700;color:#e2e8f0
+  }
+  h2{font-size:1.05rem;font-weight:700;margin-bottom:.3rem}
+  p.note{color:#94a3b8;font-size:.92rem}
+  .warn{
+    margin-top:.7rem;padding:.8rem .95rem;border-radius:.6rem;font-size:.9rem;
+    background:rgba(234,179,8,.14);border:1px solid rgba(250,204,21,.42);color:#fde68a
+  }
+  code{
+    background:rgba(148,163,184,.16);padding:.12rem .4rem;border-radius:.3rem;
+    font-size:.86em;word-break:break-all
+  }
+  footer{margin-top:2.5rem;color:#64748b;font-size:.8rem;text-align:center}
+  a{color:#7dd3fc}
+  @media (prefers-color-scheme:light){
+    body{background:#f1f5f9;color:#0f172a}
+    .sub,p.note,footer{color:#64748b}
+    li::before{background:#fff;border-color:#cbd5e1;color:#334155}
+    li{border-left-color:#e2e8f0}
+    .btn.secondary{background:#e2e8f0;color:#0f172a}
+    a{color:#0369a1}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Bin reminders</h1>
+  <p class="sub">Three taps and you will never guess which bin again.</p>
+
+  <ol>
+    <li>
+      <h2>Add the calendar</h2>
+      <p class="note">Opens Calendar and asks you to subscribe. Say yes.</p>
+      <a class="btn" href="__WEBCAL__">Subscribe to bin collections</a>
+    </li>
+
+    <li>
+      <h2>Keep the alarms</h2>
+      <p class="note">
+        Settings &rarr; Apps &rarr; Calendar &rarr; Accounts &rarr; Subscribed
+        Calendars &rarr; Bins.
+      </p>
+      <div class="warn">
+        <strong>Remove Alarms must be OFF.</strong> Leave it on and iOS strips the
+        reminders out, so you get a silent calendar entry and no notification &mdash;
+        exactly the problem you started with.
+      </div>
+    </li>
+
+    <li>
+      <h2>Put it on the home screen</h2>
+      <p class="note">
+        Open the page below in <strong>Safari</strong>, then tap Share
+        &rarr; <strong>Add to Home Screen</strong>. iOS only allows this by hand
+        &mdash; no link or QR code can do it for you.
+      </p>
+      <a class="btn secondary" href="../">Open the bin page</a>
+    </li>
+  </ol>
+
+  <footer>
+    Feed: <code>__FEED__</code><br>
+    Updates itself twice a week.
+  </footer>
+</div>
+</body>
+</html>
+""".replace("__WEBCAL__", webcal).replace("__FEED__", feed)
+
+
+def build_qr(url: str, path: pathlib.Path):
+    import qrcode
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=12,
+        border=3,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    qr.make_image(fill_color="#0f172a", back_color="white").save(path)
+
+
 def build_icon(path: pathlib.Path):
     """180x180 home-screen icon: a simple bin glyph on the site background."""
     from PIL import Image, ImageDraw
@@ -300,10 +429,13 @@ def main():
     collections = build_collections(cfg)
 
     SITE.mkdir(exist_ok=True)
+    (SITE / "setup").mkdir(exist_ok=True)
     (SITE / "bins.ics").write_text(build_ics(cfg, collections), encoding="utf-8", newline="")
     (SITE / "index.html").write_text(build_html(cfg, collections), encoding="utf-8")
+    (SITE / "setup" / "index.html").write_text(build_setup_html(cfg), encoding="utf-8")
     (SITE / ".nojekyll").write_text("", encoding="utf-8")
     build_icon(SITE / "icon.png")
+    build_qr(cfg["siteUrl"].rstrip("/") + "/setup/", SITE / "setup" / "qr.png")
 
     print(f"Wrote {len(collections)} collections through {collections[-1][0]}")
     for d, b, moved in collections[:6]:
