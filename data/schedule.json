@@ -41,10 +41,10 @@
   },
   "overrides": {},
   "lastScrape": {
-    "checkedAt": "2026-08-13T08:09:03+01:00",
+    "checkedAt": "2026-08-17T07:41:27+01:00",
     "agrees": true,
     "observed": {
-      "black": "2026-08-14",
+      "black": "2026-08-28",
       "blue": "2026-09-04",
       "brown": "2026-08-21"
     }
